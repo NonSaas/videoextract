@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap"
+      rel="stylesheet"
+    />
+    <title>Extração de Video</title>
+    <link href="/css/style.css" rel="stylesheet" type="text/css" />
+  </head>
+  <body>
+    <h1 class="title">Extrator de Vídeo</h1>
+    <form id="extract-form">
+      <label class="label-text" for="url">URL do site:</label>
+      <div class="input-group">
+        <input
+          placeholder="Coloque sua url"
+          type="text"
+          id="url"
+          name="url"
+          required
+        />
+        <button class="main-button" type="submit">Extrair</button>
+      </div>
+    </form>
+
+    <div class="buttons-group">
+      <a
+        target="_blank"
+        rel="noopener"
+        style="width: 50%"
+        id="download-button"
+        class="main-button disabled"
+      >
+        Converter video
+      </a>
+      <a style="width: 50%" id="copy-button" class="main-button disabled">
+        Copiar texto
+      </a>
+    </div>
+
+    <a
+      target="_blank"
+      rel="noopener"
+      style="width: 50%; margin-top: 10px"
+      id="convert-button"
+      class="main-button disabled opacity-0"
+    >
+      Baixar video
+    </a>
+
+    <h1 style="margin-top: 20px; font-size: 18px; font-weight: 500">
+      Outros videos:
+    </h1>
+
+    <div style="margin-top: 10px; opacity: 1" id="result"></div>
+
+    <script>
+      const mainButton = document.getElementById("download-button");
+      const copyButton = document.getElementById("copy-button");
+      const convertButton = document.getElementById("convert-button");
+
+      function delay(ms) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+      }
+
+      document
+        .getElementById("extract-form")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const url = document.getElementById("url").value;
+
+          const response = await fetch("/api/extract", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ url }),
+          });
+
+          const result = await response.json();
+
+          result.videosUrls.forEach((videoUrl) => {
+            const link = document.createElement("a");
+            link.href = videoUrl;
+            link.textContent = videoUrl;
+            link.target = "_blank";
+            link.style.display = "block";
+
+            document.getElementById("result").appendChild(link);
+          });
+
+          console.log(result);
+
+          // mainButton.setAttribute(
+          //   "href",
+          //   `/convert?url=${encodeURIComponent(result.videoUrl)}`
+          // );
+
+          mainButton.addEventListener("click", async (ev) => {
+            ev.preventDefault();
+
+            fetch("/api/proxy", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                input: [
+                  {
+                    type: "remote",
+                    source: result.videoUrl,
+                  },
+                ],
+                conversion: [
+                  {
+                    category: "audio",
+                    target: "mp3",
+                    options: {},
+                  },
+                ],
+              }),
+            })
+              .then((response) => response.json())
+              .then(async (data) => {
+                console.log("data1", data);
+
+                await delay(10000);
+
+                fetch("/api/proxy/response", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({ id: data.id }),
+                })
+                  .then((response) => response.json())
+                  .then((data2) => {
+                    // const videoUri = data.output[0].uri;
+                    console.log("data2", data2);
+
+                    convertButton.setAttribute("href", data2.output[0].uri);
+                    convertButton.classList.remove("disabled");
+                    convertButton.classList.remove("opacity-0");
+                  })
+                  .catch((error) => console.error("Erro:", error));
+              })
+              .catch((error) => console.error("Erro:", error));
+          });
+
+          mainButton.classList.remove("disabled");
+
+          copyButton.setAttribute("href", result.formatedText);
+          copyButton.classList.remove("disabled");
+
+          copyButton.addEventListener("click", (ev) => {
+            event.preventDefault();
+
+            navigator.clipboard
+              .writeText(result.formatedText)
+              .then(() => {
+                alert("Texto copiado para a área de transferência!");
+              })
+              .catch((err) => {
+                console.error("Erro ao copiar texto: ", err);
+              });
+          });
+        });
+    </script>
+  </body>
+  <style>
+    * {
+      outline: none;
+      border: none;
+      box-sizing: border-box;
+      padding: 0;
+      margin: 0;
+      font-family: "Poppins";
+    }
+
+    .opacity-0 {
+      opacity: 0 !important;
+    }
+
+    .buttons-group {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+
+      flex-direction: row;
+
+      width: 80vw;
+      margin-top: 20px;
+
+      gap: 20px;
+    }
+
+    .label-text {
+      font-size: 11px;
+      opacity: 0.8;
+    }
+
+    .disabled {
+      opacity: 0.5;
+      pointer-events: none;
+      cursor: all-scroll !important;
+    }
+
+    .input-group {
+      border: 1px solid rgb(231, 231, 231);
+      border-radius: 10px;
+
+      width: 80vw;
+
+      display: flex;
+      justify-content: center;
+      align-items: center;
+
+      flex-direction: row;
+    }
+
+    a {
+      cursor: pointer;
+      text-decoration: none;
+
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .title {
+      font-size: 56px;
+      margin-bottom: 20px;
+    }
+
+    input {
+      padding: 0px 8px;
+      width: 100%;
+    }
+
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+
+      flex-direction: column;
+
+      height: 100vh;
+      font-family: "Poppins";
+    }
+
+    .main-button {
+      padding: 5px 20px;
+      border-radius: 10px;
+      background-color: #9e5cfa;
+      color: white;
+
+      height: 40px;
+      cursor: pointer;
+
+      transition: 0.4s all;
+    }
+  </style>
+</html>
